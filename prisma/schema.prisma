@@ -1,0 +1,170 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+
+  accounts          Account[]
+  sessions          Session[]
+  flashcardProgress UserFlashcardProgress[]
+  conceptProgress   UserConceptProgress[]
+  chatMessages      ChatMessage[]
+}
+
+enum Category {
+  SYSTEM_DESIGN
+  CLOUD_DEVOPS
+  AI_ML
+  LLM_ENGINEERING
+  DATABASES
+  NETWORKING
+  KUBERNETES
+  CICD
+}
+
+enum Difficulty {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+model Concept {
+  id               String     @id @default(cuid())
+  slug             String     @unique
+  title            String
+  category         Category
+  difficulty       Difficulty
+  estimatedMinutes Int        @default(20)
+
+  simpleExplanation String   @db.Text
+  deepDive          String   @db.Text
+  whyItMatters      String   @db.Text
+  howItWorks        String   @db.Text
+  commonTradeoffs   String[]
+  commonMistakes    String[]
+  realWorldExamples Json
+  cloudUsage        Json?
+  practicalUsage    String   @db.Text
+  diagramCode       String?  @db.Text
+  diagramType       String?
+  questions         Json
+  tags              String[]
+  prerequisites     String[]
+  relatedConcepts   String[]
+  publishedAt       DateTime @default(now())
+
+  flashcards   Flashcard[]
+  userProgress UserConceptProgress[]
+}
+
+model Flashcard {
+  id         String     @id @default(cuid())
+  conceptId  String
+  concept    Concept    @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+  front      String     @db.Text
+  back       String     @db.Text
+  tag        String
+  difficulty Difficulty
+
+  userProgress UserFlashcardProgress[]
+}
+
+model UserFlashcardProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  flashcardId String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  flashcard   Flashcard @relation(fields: [flashcardId], references: [id], onDelete: Cascade)
+
+  repetitions  Int      @default(0)
+  easeFactor   Float    @default(2.5)
+  interval     Int      @default(1)
+  nextReviewAt DateTime @default(now())
+  lastRating   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, flashcardId])
+}
+
+model UserConceptProgress {
+  id        String  @id @default(cuid())
+  userId    String
+  conceptId String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  concept   Concept @relation(fields: [conceptId], references: [id], onDelete: Cascade)
+
+  completed   Boolean   @default(false)
+  score       Float?
+  completedAt DateTime?
+
+  @@unique([userId, conceptId])
+}
+
+model LearningPath {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  description    String
+  category       Category
+  conceptSlugs   String[]
+  totalConcepts  Int
+  estimatedHours Int
+  icon           String?
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conceptId String?
+  role      String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+}
